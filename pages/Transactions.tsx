@@ -5,7 +5,10 @@ import { db } from '../firebase';
 import { useAuth } from '../App';
 import { Transaction, BankAccount } from '../types';
 import { DEFAULT_CATEGORIES, getIcon } from '../constants';
-import { Plus, Calendar, Info, DollarSign } from 'lucide-react';
+import { Plus, DollarSign } from 'lucide-react';
+
+const LOCAL_TRANS_KEY = 'smartfinance_transactions';
+const LOCAL_ACCOUNTS_KEY = 'smartfinance_accounts';
 
 const Transactions: React.FC = () => {
   const { user, isTestMode } = useAuth();
@@ -25,15 +28,15 @@ const Transactions: React.FC = () => {
     if (!user) return;
 
     if (isTestMode) {
-      const demoAccs = [
-        { id: 't1', name: '測試錢包', bankName: 'DEMO', balance: 88000, color: 'bg-blue-500', createdAt: 0 },
-        { id: 't2', name: '測試儲蓄', bankName: 'DEMO', balance: 150000, color: 'bg-green-500', createdAt: 0 }
-      ];
-      setAccounts(demoAccs);
-      setAccountId(demoAccs[0].id);
-      setTransactions([
-        { id: 'tr1', accountId: 't1', amount: 500, type: 'expense', category: '飲食', note: '晚餐', date: '2024-03-21', createdAt: 0 }
-      ]);
+      // 在地交易紀錄
+      const savedTrans = localStorage.getItem(LOCAL_TRANS_KEY);
+      const savedAccs = localStorage.getItem(LOCAL_ACCOUNTS_KEY);
+      
+      const accs = savedAccs ? JSON.parse(savedAccs) : [];
+      setAccounts(accs);
+      if (accs.length > 0 && !accountId) setAccountId(accs[0].id);
+      
+      setTransactions(savedTrans ? JSON.parse(savedTrans) : []);
       return;
     }
 
@@ -60,7 +63,7 @@ const Transactions: React.FC = () => {
     
     if (isTestMode) {
       const newTrans: Transaction = {
-        id: 'tr' + Date.now(),
+        id: 'tr_' + Date.now(),
         accountId,
         amount: transAmount,
         type,
@@ -69,8 +72,23 @@ const Transactions: React.FC = () => {
         date,
         createdAt: Date.now()
       };
-      setTransactions([newTrans, ...transactions]);
-      setAccounts(accounts.map(a => a.id === accountId ? { ...a, balance: type === 'income' ? a.balance + transAmount : a.balance - transAmount } : a));
+      
+      // 更新交易清單
+      const updatedTrans = [newTrans, ...transactions];
+      setTransactions(updatedTrans);
+      localStorage.setItem(LOCAL_TRANS_KEY, JSON.stringify(updatedTrans));
+      
+      // 更新在地帳戶餘額
+      const updatedAccs = accounts.map(a => {
+        if (a.id === accountId) {
+          const newBalance = type === 'income' ? a.balance + transAmount : a.balance - transAmount;
+          return { ...a, balance: newBalance };
+        }
+        return a;
+      });
+      setAccounts(updatedAccs);
+      localStorage.setItem(LOCAL_ACCOUNTS_KEY, JSON.stringify(updatedAccs));
+
       setIsModalOpen(false);
       setAmount(''); setNote('');
       return;
@@ -100,8 +118,7 @@ const Transactions: React.FC = () => {
       setIsModalOpen(false);
       setAmount(''); setNote('');
     } catch (err) {
-      console.error(err);
-      alert("儲存失敗，請檢查資料庫規則。");
+      alert("儲存失敗。");
     }
   };
 
@@ -109,110 +126,119 @@ const Transactions: React.FC = () => {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">財務收支紀錄</h2>
-          <p className="text-slate-500">掌握每一筆金流去向</p>
+          <h2 className="text-2xl font-bold text-slate-800">交易明細</h2>
+          <p className="text-slate-500">記錄您的日常每一筆金流</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-all flex items-center gap-2"
+          className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-100"
         >
           <Plus className="w-5 h-5" />
           記一筆
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">日期</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">類別</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">帳戶</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">內容</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase text-right">金額</th>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">日期</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">類別</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">帳戶</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">備註</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">金額</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {transactions.map(t => {
                 const account = accounts.find(a => a.id === t.accountId);
                 return (
-                  <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 text-sm text-slate-600">{t.date}</td>
+                  <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="px-6 py-4 text-sm font-medium text-slate-500">{t.date}</td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <span className="p-1.5 bg-slate-100 rounded-lg text-slate-600">
+                      <div className="flex items-center gap-3">
+                        <span className="p-2 bg-slate-100 rounded-xl text-slate-600">
                           {getIcon(DEFAULT_CATEGORIES.find(c => c.name === t.category)?.icon || '')}
                         </span>
-                        <span className="font-medium text-slate-800">{t.category}</span>
+                        <span className="font-bold text-slate-700">{t.category}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-500">{account?.name || '未知帳戶'}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{t.note}</td>
-                    <td className={`px-6 py-4 text-sm font-bold text-right ${t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    <td className="px-6 py-4">
+                      <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-xs font-bold">
+                        {account?.name || '未知帳戶'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-500">{t.note || '-'}</td>
+                    <td className={`px-6 py-4 text-base font-black text-right ${t.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}`}>
                       {t.type === 'income' ? '+' : '-'}${t.amount.toLocaleString()}
                     </td>
                   </tr>
                 );
               })}
+              {transactions.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-20 text-center text-slate-300 font-medium">尚無任何交易紀錄</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-lg p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
-            <h3 className="text-2xl font-bold mb-6 text-slate-800">新增財務紀錄</h3>
-            <form onSubmit={handleAddTransaction} className="space-y-5">
-              <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-[2rem] w-full max-w-lg p-8 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <h3 className="text-2xl font-bold mb-6 text-slate-800">新增紀錄</h3>
+            <form onSubmit={handleAddTransaction} className="space-y-6">
+              <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-100 rounded-2xl">
                 <button 
-                  type="button" onClick={() => setType('expense')}
-                  className={`py-2 px-4 rounded-lg font-bold transition-all ${type === 'expense' ? 'bg-white text-rose-500 shadow-sm' : 'text-slate-500'}`}
+                  type="button" onClick={() => { setType('expense'); setCategory(DEFAULT_CATEGORIES[0].name); }}
+                  className={`py-3 rounded-xl font-bold transition-all ${type === 'expense' ? 'bg-white text-rose-500 shadow-sm' : 'text-slate-400'}`}
                 >支出</button>
                 <button 
-                  type="button" onClick={() => setType('income')}
-                  className={`py-2 px-4 rounded-lg font-bold transition-all ${type === 'income' ? 'bg-white text-emerald-500 shadow-sm' : 'text-slate-500'}`}
+                  type="button" onClick={() => { setType('income'); setCategory(DEFAULT_CATEGORIES.find(c => c.type === 'income')?.name || ''); }}
+                  className={`py-3 rounded-xl font-bold transition-all ${type === 'income' ? 'bg-white text-emerald-500 shadow-sm' : 'text-slate-400'}`}
                 >收入</button>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-slate-700">金額</label>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-2">金額</label>
                   <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" required />
+                    <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                    <input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="w-full pl-10 pr-4 py-4 bg-slate-50 rounded-2xl outline-none font-black text-xl" required />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-slate-700">日期</label>
-                  <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" required />
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-2">日期</label>
+                  <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full px-4 py-4 bg-slate-50 rounded-2xl outline-none font-bold" required />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-slate-700">銀行帳戶</label>
-                  <select value={accountId} onChange={e => setAccountId(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none">
-                    {accounts.length > 0 ? accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>) : <option disabled>請先新增帳戶</option>}
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-2">選擇帳戶</label>
+                  <select value={accountId} onChange={e => setAccountId(e.target.value)} className="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
+                    {accounts.length > 0 ? accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>) : <option disabled>請先建立帳戶</option>}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-slate-700">分類</label>
-                  <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none">
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-2">類別</label>
+                  <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
                     {DEFAULT_CATEGORIES.filter(c => c.type === type).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold mb-2 text-slate-700">備註</label>
-                <textarea value={note} onChange={e => setNote(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none min-h-[80px]" placeholder="寫點什麼..." />
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">備註</label>
+                <input value={note} onChange={e => setNote(e.target.value)} className="w-full px-4 py-4 bg-slate-50 rounded-2xl outline-none font-medium" placeholder="寫點什麼..." />
               </div>
 
               <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 font-bold text-slate-500 hover:bg-slate-50 rounded-xl">取消</button>
-                <button type="submit" disabled={accounts.length === 0} className="flex-1 py-4 font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-lg disabled:opacity-50">儲存紀錄</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 font-bold text-slate-400 hover:bg-slate-50 rounded-2xl">取消</button>
+                <button type="submit" disabled={accounts.length === 0} className="flex-1 py-4 font-bold bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 shadow-lg disabled:opacity-50">儲存紀錄</button>
               </div>
             </form>
           </div>

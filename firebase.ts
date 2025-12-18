@@ -1,13 +1,12 @@
 
 import { initializeApp } from 'firebase/app';
 import type { FirebaseApp } from 'firebase/app';
-// Separate value and type imports to ensure standard member resolution in the build environment
 import { getAuth } from 'firebase/auth';
 import type { Auth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import type { Firestore } from 'firebase/firestore';
 
-// 聲明環境變數型別以通過 tsc 編譯
+// 宣告環境變數
 declare const process: {
   env: {
     FIREBASE_CONFIG: string;
@@ -15,26 +14,29 @@ declare const process: {
   }
 };
 
-const firebaseConfigStr = process.env.FIREBASE_CONFIG;
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
-let isDemoMode = false;
+let isDemoMode = true;
 
-if (firebaseConfigStr && firebaseConfigStr !== 'null') {
+const configStr = process.env.FIREBASE_CONFIG;
+
+// 檢查配置字串是否有效 (不為 null, undefined 或字串 "null")
+if (configStr && configStr !== "null" && configStr !== "undefined") {
   try {
-    const config = JSON.parse(firebaseConfigStr);
-    app = initializeApp(config);
-    auth = getAuth(app);
-    db = getFirestore(app);
-    console.log("Firebase initialized successfully");
-  } catch (error) {
-    console.error("Firebase initialization failed, entering demo mode", error);
-    isDemoMode = true;
+    const config = JSON.parse(configStr);
+    if (config.apiKey) {
+      app = initializeApp(config);
+      auth = getAuth(app);
+      db = getFirestore(app);
+      isDemoMode = false;
+      console.log("✅ Firebase 雲端同步模式已啟動");
+    }
+  } catch (e) {
+    console.warn("⚠️ Firebase 配置解析失敗，將使用在地儲存模式 (Local Storage Mode)");
   }
 } else {
-  console.warn("No Firebase config found, entering demo mode");
-  isDemoMode = true;
+  console.log("💡 偵測不到 Firebase 配置，已自動切換至在地儲存模式 (Local Storage Mode)");
 }
 
 export { auth, db, isDemoMode };

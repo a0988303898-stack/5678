@@ -4,7 +4,7 @@ import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/f
 import { db } from '../firebase';
 import { useAuth } from '../App';
 import { BankAccount, Transaction } from '../types';
-import { Wallet, ArrowUpCircle, ArrowDownCircle, Plus, History, PieChart } from 'lucide-react';
+import { Wallet, ArrowUpCircle, ArrowDownCircle, History, PieChart } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const Dashboard: React.FC = () => {
@@ -17,18 +17,11 @@ const Dashboard: React.FC = () => {
     if (!user) return;
 
     if (isTestMode) {
-      // 測試模式模擬資料
-      const demoAccounts: BankAccount[] = [
-        { id: '1', name: '測試錢包', bankName: 'Virtual Bank', balance: 88000, color: 'bg-indigo-600', createdAt: Date.now() },
-        { id: '2', name: '虛擬儲蓄', bankName: 'Cloud Bank', balance: 150000, color: 'bg-emerald-500', createdAt: Date.now() }
-      ];
-      const demoTransactions: Transaction[] = [
-        { id: '1', accountId: '1', amount: 150, type: 'expense', category: '飲食', note: '午餐', date: '2024-03-21', createdAt: Date.now() },
-        { id: '2', accountId: '1', amount: 3000, type: 'income', category: '獎金', note: '業績獎金', date: '2024-03-20', createdAt: Date.now() },
-        { id: '3', accountId: '2', amount: 500, type: 'expense', category: '交通', note: '加油', date: '2024-03-19', createdAt: Date.now() }
-      ];
-      setAccounts(demoAccounts);
-      setTransactions(demoTransactions);
+      const savedAccs = localStorage.getItem('smartfinance_accounts');
+      const savedTrans = localStorage.getItem('smartfinance_transactions');
+      
+      setAccounts(savedAccs ? JSON.parse(savedAccs) : []);
+      setTransactions(savedTrans ? JSON.parse(savedTrans) : []);
       setLoading(false);
       return;
     }
@@ -55,22 +48,30 @@ const Dashboard: React.FC = () => {
   }, [user, isTestMode]);
 
   const totalBalance = accounts.reduce((acc, curr) => acc + curr.balance, 0);
-  const monthlyIncome = transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
-  const monthlyExpense = transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
+  const monthlyIncome = transactions
+    .filter(t => t.type === 'income' && t.date.startsWith(new Date().toISOString().slice(0, 7)))
+    .reduce((acc, curr) => acc + curr.amount, 0);
+  const monthlyExpense = transactions
+    .filter(t => t.type === 'expense' && t.date.startsWith(new Date().toISOString().slice(0, 7)))
+    .reduce((acc, curr) => acc + curr.amount, 0);
 
   const chartData = [
-    { name: '收入', value: monthlyIncome, color: '#10b981' },
-    { name: '支出', value: monthlyExpense, color: '#ef4444' }
+    { name: '本月收入', value: monthlyIncome || 0, color: '#10b981' },
+    { name: '本月支出', value: monthlyExpense || 0, color: '#ef4444' }
   ];
+
+  if (loading) return null;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">
-            {isTestMode ? '測試環境儀表板' : `歡迎回來，${user?.email?.split('@')[0]}`}
+          <h2 className="text-3xl font-black text-slate-800">
+            {isTestMode ? '在地數據概覽' : `主儀表板`}
           </h2>
-          <p className="text-slate-500">{isTestMode ? '您正在免登入模式下體驗功能' : '這是您目前的財務概況'}</p>
+          <p className="text-slate-400 font-medium">
+            {isTestMode ? '資料目前存於您的瀏覽器中' : `歡迎回來，${user?.email?.split('@')[0]}`}
+          </p>
         </div>
       </header>
 
@@ -81,19 +82,19 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-          <h3 className="text-lg font-bold mb-6 text-slate-800 flex items-center gap-2">
+        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
+          <h3 className="text-lg font-bold mb-8 text-slate-800 flex items-center gap-3">
             <PieChart className="w-5 h-5 text-indigo-500" />
-            收支比例分析
+            本月收支比例
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip cursor={{fill: 'transparent'}} />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
+              <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 600}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
+                <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} />
+                <Bar dataKey="value" radius={[8, 8, 8, 8]} barSize={50}>
                   {chartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
@@ -103,31 +104,32 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-          <h3 className="text-lg font-bold mb-6 text-slate-800 flex items-center gap-2">
+        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
+          <h3 className="text-lg font-bold mb-8 text-slate-800 flex items-center gap-3">
             <History className="w-5 h-5 text-indigo-500" />
-            最近交易
+            最近活動
           </h3>
           <div className="space-y-4">
-            {transactions.length === 0 ? (
-              <p className="text-center text-slate-400 py-10">尚無交易紀錄</p>
-            ) : (
-              transactions.map(t => (
-                <div key={t.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${t.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                      {t.type === 'income' ? <ArrowUpCircle className="w-5 h-5" /> : <ArrowDownCircle className="w-5 h-5" />}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-800">{t.category}</p>
-                      <p className="text-xs text-slate-500">{t.date} • {t.note}</p>
-                    </div>
+            {transactions.slice(0, 5).map(t => (
+              <div key={t.id} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${t.type === 'income' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                    {t.type === 'income' ? <ArrowUpCircle className="w-6 h-6" /> : <ArrowDownCircle className="w-6 h-6" />}
                   </div>
-                  <span className={`font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                    {t.type === 'income' ? '+' : '-'}${t.amount.toLocaleString()}
-                  </span>
+                  <div>
+                    <p className="font-bold text-slate-800">{t.category}</p>
+                    <p className="text-xs text-slate-400 font-bold">{t.date}</p>
+                  </div>
                 </div>
-              ))
+                <span className={`text-lg font-black ${t.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                  {t.type === 'income' ? '+' : '-'}{t.amount.toLocaleString()}
+                </span>
+              </div>
+            ))}
+            {transactions.length === 0 && (
+              <div className="text-center py-10">
+                 <p className="text-slate-300 font-bold">尚無活動紀錄</p>
+              </div>
             )}
           </div>
         </div>
@@ -137,12 +139,12 @@ const Dashboard: React.FC = () => {
 };
 
 const StatCard = ({ title, value, icon, color }: { title: string, value: number, icon: React.ReactNode, color: string }) => (
-  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-start justify-between">
+  <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 flex items-start justify-between group hover:border-indigo-100 transition-all">
     <div>
-      <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
-      <h4 className="text-2xl font-bold text-slate-900">${value.toLocaleString()}</h4>
+      <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">{title}</p>
+      <h4 className="text-3xl font-black text-slate-900">${value.toLocaleString()}</h4>
     </div>
-    <div className={`p-3 rounded-xl bg-${color}-50`}>
+    <div className={`p-4 rounded-2xl bg-${color}-50 group-hover:scale-110 transition-transform`}>
       {icon}
     </div>
   </div>
