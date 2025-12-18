@@ -9,14 +9,13 @@ declare const process: {
 };
 
 export const getFinancialAdvice = async (transactions: any[], accounts: any[]) => {
-  // 檢查 API Key 是否有效
   const apiKey = process.env.API_KEY;
   if (!apiKey || apiKey === 'null' || apiKey === 'undefined') {
-    return "系統偵測到未設定 API Key，無法提供 AI 分析。請確保在 GitHub Secrets 或環境變數中設定 API_KEY。";
+    return "系統偵測到未設定 API Key，無法提供 AI 分析。請在環境變數或專案設定中加入 API_KEY。";
   }
 
   try {
-    // 根據規範初始化 GoogleGenAI
+    // 正確初始化 AI 客戶端
     const ai = new GoogleGenAI({ apiKey });
 
     const dataSummary = {
@@ -32,17 +31,18 @@ export const getFinancialAdvice = async (transactions: any[], accounts: any[]) =
 
     const prompt = `
       你是 SmartFinance AI 財務顧問。請根據以下用戶的財務數據提供 3-5 條具體的理財建議。
-      請分析收支比例、潛在的浪費、以及資產配置。
-      輸出格式要求：
+      請針對當前資產狀態與最近支出模式進行分析。
+      
+      格式要求：
       1. 使用繁體中文。
-      2. 格式要專業且親切。
+      2. 專業且富有鼓勵性。
       3. 以 Markdown 格式輸出。
 
-      數據內容：
+      用戶數據摘要：
       ${JSON.stringify(dataSummary, null, 2)}
     `;
 
-    // 使用 gemini-3-pro-preview 處理複雜推理任務
+    // 呼叫 Gemini 3 Pro 進行生成
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: prompt,
@@ -51,10 +51,10 @@ export const getFinancialAdvice = async (transactions: any[], accounts: any[]) =
       }
     });
 
-    // 規範要求直接存取 .text 屬性，不使用方法調用
-    return response.text || "AI 目前無法生成建議，請稍後再試。";
+    // 根據規範，直接讀取 .text 屬性（非方法）
+    return response.text || "AI 暫時無法生成分析報告，請稍後再試。";
   } catch (error) {
-    console.error("Gemini AI Analysis error:", error);
-    return "AI 服務暫時無法回應。可能是 API 額度已滿或網路連線問題。";
+    console.error("Gemini AI error:", error);
+    return "AI 服務目前的連線有些問題，請檢查 API 金鑰額度。";
   }
 };
