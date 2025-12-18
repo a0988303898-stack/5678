@@ -1,14 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, query, where, onSnapshot, doc, getDoc, updateDoc, orderBy } from 'firebase/firestore';
-import { db, isDemoMode } from '../firebase';
+import { db } from '../firebase';
 import { useAuth } from '../App';
 import { Transaction, BankAccount } from '../types';
 import { DEFAULT_CATEGORIES, getIcon } from '../constants';
-import { Plus, Filter, Calendar, Tag, Info, DollarSign } from 'lucide-react';
+import { Plus, Calendar, Info, DollarSign } from 'lucide-react';
 
 const Transactions: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isTestMode } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -23,18 +23,27 @@ const Transactions: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
-    if (isDemoMode) {
-      setAccounts([{ id: '1', name: '預設帳戶', bankName: 'DEMO', balance: 50000, color: 'bg-blue-500', createdAt: 0 }]);
-      setTransactions([{ id: '1', accountId: '1', amount: 500, type: 'expense', category: '飲食', note: '晚餐', date: '2024-03-21', createdAt: 0 }]);
+
+    if (isTestMode) {
+      const demoAccs = [
+        { id: 't1', name: '測試錢包', bankName: 'DEMO', balance: 88000, color: 'bg-blue-500', createdAt: 0 },
+        { id: 't2', name: '測試儲蓄', bankName: 'DEMO', balance: 150000, color: 'bg-green-500', createdAt: 0 }
+      ];
+      setAccounts(demoAccs);
+      setAccountId(demoAccs[0].id);
+      setTransactions([
+        { id: 'tr1', accountId: 't1', amount: 500, type: 'expense', category: '飲食', note: '晚餐', date: '2024-03-21', createdAt: 0 }
+      ]);
       return;
     }
+
     if (!db) return;
 
     const qAccounts = query(collection(db, 'accounts'), where('userId', '==', user.uid));
     const unsubAccounts = onSnapshot(qAccounts, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount));
       setAccounts(data);
-      if (data.length > 0) setAccountId(data[0].id);
+      if (data.length > 0 && !accountId) setAccountId(data[0].id);
     });
 
     const qTrans = query(collection(db, 'transactions'), where('userId', '==', user.uid), orderBy('date', 'desc'));
@@ -43,15 +52,32 @@ const Transactions: React.FC = () => {
     });
 
     return () => { unsubAccounts(); unsubTrans(); };
-  }, [user]);
+  }, [user, isTestMode]);
 
   const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isDemoMode) return alert("展示模式下無法新增紀錄。");
-    if (!db || !user || !accountId) return;
+    const transAmount = Number(amount);
+    
+    if (isTestMode) {
+      const newTrans: Transaction = {
+        id: 'tr' + Date.now(),
+        accountId,
+        amount: transAmount,
+        type,
+        category,
+        note,
+        date,
+        createdAt: Date.now()
+      };
+      setTransactions([newTrans, ...transactions]);
+      setAccounts(accounts.map(a => a.id === accountId ? { ...a, balance: type === 'income' ? a.balance + transAmount : a.balance - transAmount } : a));
+      setIsModalOpen(false);
+      setAmount(''); setNote('');
+      return;
+    }
 
+    if (!db || !user || !accountId) return;
     try {
-      const transAmount = Number(amount);
       await addDoc(collection(db, 'transactions'), {
         userId: user.uid,
         accountId,
@@ -63,7 +89,6 @@ const Transactions: React.FC = () => {
         createdAt: Date.now()
       });
 
-      // Update account balance
       const accountRef = doc(db, 'accounts', accountId);
       const accountSnap = await getDoc(accountRef);
       if (accountSnap.exists()) {
@@ -73,10 +98,10 @@ const Transactions: React.FC = () => {
       }
 
       setIsModalOpen(false);
-      setAmount('');
-      setNote('');
+      setAmount(''); setNote('');
     } catch (err) {
       console.error(err);
+      alert("儲存失敗，請檢查資料庫規則。");
     }
   };
 
@@ -130,11 +155,6 @@ const Transactions: React.FC = () => {
                   </tr>
                 );
               })}
-              {transactions.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-20 text-center text-slate-400">尚無交易紀錄</td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
@@ -142,7 +162,7 @@ const Transactions: React.FC = () => {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-lg p-8 shadow-2xl">
+          <div className="bg-white rounded-3xl w-full max-w-lg p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
             <h3 className="text-2xl font-bold mb-6 text-slate-800">新增財務紀錄</h3>
             <form onSubmit={handleAddTransaction} className="space-y-5">
               <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
@@ -161,15 +181,12 @@ const Transactions: React.FC = () => {
                   <label className="block text-sm font-semibold mb-2 text-slate-700">金額</label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" required />
+                    <input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" required />
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-slate-700">日期</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" required />
-                  </div>
+                  <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" required />
                 </div>
               </div>
 
@@ -177,7 +194,7 @@ const Transactions: React.FC = () => {
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-slate-700">銀行帳戶</label>
                   <select value={accountId} onChange={e => setAccountId(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none">
-                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    {accounts.length > 0 ? accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>) : <option disabled>請先新增帳戶</option>}
                   </select>
                 </div>
                 <div>
@@ -190,15 +207,12 @@ const Transactions: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-semibold mb-2 text-slate-700">備註</label>
-                <div className="relative">
-                  <Info className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                  <textarea value={note} onChange={e => setNote(e.target.value)} className="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none min-h-[100px]" placeholder="寫點什麼..." />
-                </div>
+                <textarea value={note} onChange={e => setNote(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none min-h-[80px]" placeholder="寫點什麼..." />
               </div>
 
               <div className="flex gap-3 pt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 font-bold text-slate-500 hover:bg-slate-50 rounded-xl">取消</button>
-                <button type="submit" className="flex-1 py-4 font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-100">儲存紀錄</button>
+                <button type="submit" disabled={accounts.length === 0} className="flex-1 py-4 font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-lg disabled:opacity-50">儲存紀錄</button>
               </div>
             </form>
           </div>

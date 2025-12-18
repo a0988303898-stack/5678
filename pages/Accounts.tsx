@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, query, where, onSnapshot, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { db, isDemoMode } from '../firebase';
+import { collection, addDoc, query, where, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { useAuth } from '../App';
 import { BankAccount } from '../types';
-import { Plus, Trash2, Edit3, Building2, CreditCard } from 'lucide-react';
+import { Plus, Trash2, Building2, CreditCard, AlertCircle } from 'lucide-react';
 
 const Accounts: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isTestMode } = useAuth();
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState('');
@@ -16,13 +16,16 @@ const Accounts: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
-    if (isDemoMode) {
+
+    if (isTestMode) {
+      // 測試模式初始資料
       setAccounts([
-        { id: '1', name: '主要薪轉', bankName: '國泰世華', balance: 120000, color: 'bg-indigo-600', createdAt: Date.now() },
-        { id: '2', name: '儲蓄帳戶', bankName: '玉山銀行', balance: 500000, color: 'bg-emerald-600', createdAt: Date.now() }
+        { id: 't1', name: '測試錢包', bankName: 'Virtual Bank', balance: 88000, color: 'bg-indigo-600', createdAt: Date.now() },
+        { id: 't2', name: '測試儲蓄', bankName: 'Cloud Bank', balance: 150000, color: 'bg-emerald-600', createdAt: Date.now() }
       ]);
       return;
     }
+
     if (!db) return;
 
     const q = query(collection(db, 'accounts'), where('userId', '==', user.uid));
@@ -30,13 +33,27 @@ const Accounts: React.FC = () => {
       setAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount)));
     });
     return unsubscribe;
-  }, [user]);
+  }, [user, isTestMode]);
 
   const handleAddAccount = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isDemoMode) return alert("展示模式下無法新增資料。");
-    if (!db || !user) return;
+    
+    if (isTestMode) {
+      const newAcc: BankAccount = {
+        id: 't' + Date.now(),
+        name,
+        bankName,
+        balance: Number(balance),
+        color: 'bg-indigo-600',
+        createdAt: Date.now()
+      };
+      setAccounts([...accounts, newAcc]);
+      setIsModalOpen(false);
+      setName(''); setBankName(''); setBalance(0);
+      return;
+    }
 
+    if (!db || !user) return;
     try {
       await addDoc(collection(db, 'accounts'), {
         userId: user.uid,
@@ -47,18 +64,20 @@ const Accounts: React.FC = () => {
         createdAt: Date.now()
       });
       setIsModalOpen(false);
-      setName('');
-      setBankName('');
-      setBalance(0);
+      setName(''); setBankName(''); setBalance(0);
     } catch (err) {
       console.error(err);
+      alert("儲存失敗，請檢查權限設定。");
     }
   };
 
   const deleteAccount = async (id: string) => {
-    if (isDemoMode) return alert("展示模式下無法刪除資料。");
-    if (!db) return;
-    if (confirm("確定要刪除此帳戶嗎？這將會導致資料永久丟失。")) {
+    if (confirm("確定要刪除此帳戶嗎？")) {
+      if (isTestMode) {
+        setAccounts(accounts.filter(a => a.id !== id));
+        return;
+      }
+      if (!db) return;
       await deleteDoc(doc(db, 'accounts', id));
     }
   };
@@ -88,11 +107,9 @@ const Accounts: React.FC = () => {
                 <div className="p-3 bg-indigo-50 rounded-xl">
                   <Building2 className="w-6 h-6 text-indigo-600" />
                 </div>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => deleteAccount(account.id)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                <button onClick={() => deleteAccount(account.id)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
               <h3 className="text-xl font-bold text-slate-800">{account.name}</h3>
               <p className="text-slate-400 text-sm mb-4">{account.bankName}</p>
@@ -117,21 +134,21 @@ const Accounts: React.FC = () => {
                 <label className="block text-sm font-semibold mb-2">帳戶名稱</label>
                 <input 
                   value={name} onChange={e => setName(e.target.value)}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" placeholder="例如：生活開銷帳戶" required 
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="例如：生活開銷帳戶" required 
                 />
               </div>
               <div>
                 <label className="block text-sm font-semibold mb-2">銀行名稱</label>
                 <input 
                   value={bankName} onChange={e => setBankName(e.target.value)}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" placeholder="例如：中國信託" required 
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="例如：中國信託" required 
                 />
               </div>
               <div>
                 <label className="block text-sm font-semibold mb-2">初始餘額</label>
                 <input 
                   type="number" value={balance} onChange={e => setBalance(Number(e.target.value))}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" required 
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" required 
                 />
               </div>
               <div className="flex gap-3 pt-4">

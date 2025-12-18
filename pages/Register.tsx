@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-// Explicitly import from firebase/auth for modular SDK
+// Fix: Standard modular import for Firebase Authentication functions
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, isDemoMode } from '../firebase';
 import { Link, useNavigate } from 'react-router-dom';

@@ -1,9 +1,10 @@
 
-import { initializeApp, type FirebaseApp } from 'firebase/app';
-// Separate type import for Auth to fix "no exported member" error in some TS environments
-import { getAuth } from 'firebase/auth';
-import type { Auth } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
+import { initializeApp } from 'firebase/app';
+import type { FirebaseApp } from 'firebase/app';
+// Fix: Grouping named imports from the same module to ensure correct resolution of both values and types
+import { getAuth, type Auth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import type { Firestore } from 'firebase/firestore';
 
 // 聲明環境變數型別以通過 tsc 編譯
 declare const process: {
