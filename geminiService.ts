@@ -1,5 +1,6 @@
 
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
+import type { GenerateContentResponse } from "@google/genai";
 
 // 聲明環境變數型別以通過 tsc 編譯
 declare const process: {
@@ -38,10 +39,12 @@ export const getFinancialAdvice = async (transactions: any[], accounts: any[]) =
     `;
 
     // Always use ai.models.generateContent directly
+    // Using gemini-3-pro-preview for complex reasoning tasks
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: prompt,
       config: {
+        // Thinking Config is available for Gemini 3 series, max budget for Pro is 32768
         thinkingConfig: { thinkingBudget: 32768 }
       }
     });

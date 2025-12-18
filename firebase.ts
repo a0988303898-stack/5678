@@ -1,6 +1,8 @@
 
 import { initializeApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, type Auth } from 'firebase/auth';
+// Separate type import for Auth to fix "no exported member" error in some TS environments
+import { getAuth } from 'firebase/auth';
+import type { Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 
 // 聲明環境變數型別以通過 tsc 編譯
