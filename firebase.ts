@@ -1,8 +1,9 @@
 
 import { initializeApp } from 'firebase/app';
 import type { FirebaseApp } from 'firebase/app';
-// Fix: Grouping named imports from the same module to ensure correct resolution of both values and types
-import { getAuth, type Auth } from 'firebase/auth';
+// Separate value and type imports to ensure standard member resolution in the build environment
+import { getAuth } from 'firebase/auth';
+import type { Auth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import type { Firestore } from 'firebase/firestore';
 

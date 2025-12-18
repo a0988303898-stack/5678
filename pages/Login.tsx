@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-// Fix: Standard modular import for Firebase Authentication functions
+// Explicitly importing required auth functions to satisfy modular export checks
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth, isDemoMode as firebaseUnconfigured } from '../firebase';
 import { Link, useNavigate } from 'react-router-dom';

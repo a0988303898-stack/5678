@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
-// Fix: Consolidated named and type imports from firebase/auth
-import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
+// Standard modular imports for Firebase Auth functionality
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import type { User } from 'firebase/auth';
 import { auth, isDemoMode as firebaseUnconfigured } from './firebase';
 import { LayoutDashboard, Wallet, Receipt, PieChart, LogOut, ShieldAlert, FlaskConical } from 'lucide-react';
 

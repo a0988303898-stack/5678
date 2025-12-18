@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-// Fix: Standard modular import for Firebase Authentication functions
+// Correct modular import for registration functions
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, isDemoMode } from '../firebase';
 import { Link, useNavigate } from 'react-router-dom';
@@ -12,7 +12,7 @@ const Register: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+  navigate = useNavigate();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
