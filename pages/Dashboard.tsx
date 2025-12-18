@@ -129,4 +129,29 @@ const Dashboard: React.FC = () => {
                       <p className="text-xs text-slate-500">{t.date} • {t.note}</p>
                     </div>
                   </div>
-                  <span className={`font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'
+                  <span className={`font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {t.type === 'income' ? '+' : '-'}${t.amount.toLocaleString()}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const StatCard = ({ title, value, icon, color }: { title: string, value: number, icon: React.ReactNode, color: string }) => (
+  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-start justify-between">
+    <div>
+      <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
+      <h4 className="text-2xl font-bold text-slate-900">${value.toLocaleString()}</h4>
+    </div>
+    <div className={`p-3 rounded-xl bg-${color}-50`}>
+      {icon}
+    </div>
+  </div>
+);
+
+export default Dashboard;
