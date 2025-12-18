@@ -1,15 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
-import { db, isDemoMode } from '../firebase';
+import { db } from '../firebase';
 import { useAuth } from '../App';
 import { BankAccount, Transaction } from '../types';
-// Add PieChart to the lucide-react imports to resolve the missing component error on line 90
 import { Wallet, ArrowUpCircle, ArrowDownCircle, Plus, History, PieChart } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const Dashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isTestMode } = useAuth();
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,15 +16,16 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
-    // Demo Data
-    if (isDemoMode) {
+    if (isTestMode) {
+      // 測試模式模擬資料
       const demoAccounts: BankAccount[] = [
-        { id: '1', name: '中國信託', bankName: 'CTBC', balance: 50000, color: 'bg-green-600', createdAt: Date.now() },
-        { id: '2', name: '台新銀行', bankName: 'Taishin', balance: 12000, color: 'bg-red-500', createdAt: Date.now() }
+        { id: '1', name: '測試錢包', bankName: 'Virtual Bank', balance: 88000, color: 'bg-indigo-600', createdAt: Date.now() },
+        { id: '2', name: '虛擬儲蓄', bankName: 'Cloud Bank', balance: 150000, color: 'bg-emerald-500', createdAt: Date.now() }
       ];
       const demoTransactions: Transaction[] = [
-        { id: '1', accountId: '1', amount: 1200, type: 'expense', category: '飲食', note: '午餐', date: '2024-03-20', createdAt: Date.now() },
-        { id: '2', accountId: '1', amount: 45000, type: 'income', category: '薪資', note: '3月工資', date: '2024-03-05', createdAt: Date.now() }
+        { id: '1', accountId: '1', amount: 150, type: 'expense', category: '飲食', note: '午餐', date: '2024-03-21', createdAt: Date.now() },
+        { id: '2', accountId: '1', amount: 3000, type: 'income', category: '獎金', note: '業績獎金', date: '2024-03-20', createdAt: Date.now() },
+        { id: '3', accountId: '2', amount: 500, type: 'expense', category: '交通', note: '加油', date: '2024-03-19', createdAt: Date.now() }
       ];
       setAccounts(demoAccounts);
       setTransactions(demoTransactions);
@@ -52,7 +52,7 @@ const Dashboard: React.FC = () => {
     });
 
     return () => { unsubAccounts(); unsubTrans(); };
-  }, [user]);
+  }, [user, isTestMode]);
 
   const totalBalance = accounts.reduce((acc, curr) => acc + curr.balance, 0);
   const monthlyIncome = transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
@@ -67,14 +67,10 @@ const Dashboard: React.FC = () => {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">歡迎回來，{user?.email?.split('@')[0]}</h2>
-          <p className="text-slate-500">這是您目前的財務概況</p>
-        </div>
-        <div className="flex gap-2">
-          <button className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
-            <Plus className="w-4 h-4" />
-            快速記帳
-          </button>
+          <h2 className="text-2xl font-bold text-slate-800">
+            {isTestMode ? '測試環境儀表板' : `歡迎回來，${user?.email?.split('@')[0]}`}
+          </h2>
+          <p className="text-slate-500">{isTestMode ? '您正在免登入模式下體驗功能' : '這是您目前的財務概況'}</p>
         </div>
       </header>
 
@@ -85,7 +81,6 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Charts */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
           <h3 className="text-lg font-bold mb-6 text-slate-800 flex items-center gap-2">
             <PieChart className="w-5 h-5 text-indigo-500" />
@@ -108,7 +103,6 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Recent Transactions */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
           <h3 className="text-lg font-bold mb-6 text-slate-800 flex items-center gap-2">
             <History className="w-5 h-5 text-indigo-500" />

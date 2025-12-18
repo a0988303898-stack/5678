@@ -1,11 +1,15 @@
 
-// Use separate type imports for Firebase types to avoid value-level export errors
-import { initializeApp } from 'firebase/app';
-import type { FirebaseApp } from 'firebase/app';
-// Fix: Consolidate modular Firebase Auth named exports to ensure they are correctly resolved by the compiler
-import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import type { Firestore } from 'firebase/firestore';
+import { initializeApp, type FirebaseApp } from 'firebase/app';
+import { getAuth, type Auth } from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore';
+
+// 聲明環境變數型別以通過 tsc 編譯
+declare const process: {
+  env: {
+    FIREBASE_CONFIG: string;
+    API_KEY: string;
+  }
+};
 
 const firebaseConfigStr = process.env.FIREBASE_CONFIG;
 let app: FirebaseApp | null = null;
@@ -13,7 +17,7 @@ let auth: Auth | null = null;
 let db: Firestore | null = null;
 let isDemoMode = false;
 
-if (firebaseConfigStr) {
+if (firebaseConfigStr && firebaseConfigStr !== 'null') {
   try {
     const config = JSON.parse(firebaseConfigStr);
     app = initializeApp(config);

@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
-// Fix: Standardized modular Firebase Auth import for signInWithEmailAndPassword
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth, isDemoMode } from '../firebase';
+import { auth, isDemoMode as firebaseUnconfigured } from '../firebase';
 import { Link, useNavigate } from 'react-router-dom';
-import { Wallet, Mail, Lock, AlertCircle } from 'lucide-react';
+import { useAuth } from '../App';
+import { Wallet, Mail, Lock, AlertCircle, FlaskConical, ShieldCheck } from 'lucide-react';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -12,11 +12,12 @@ const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { enterTestMode } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isDemoMode) {
-      setError("當前處於展示模式，請點擊「進入展示系統」按鈕直接存取。");
+    if (firebaseUnconfigured) {
+      setError("Firebase 未配置，無法使用正式模式。請點擊下方的「進入測試模式」進行預覽。");
       return;
     }
     if (!auth) return;
@@ -33,12 +34,9 @@ const Login: React.FC = () => {
     }
   };
 
-  const enterDemo = () => {
-    // Note: In a real app, you'd mock a user object.
-    // Here we just navigate and let App component handle the demo state if needed.
-    // But since auth listener handles state, we can't truly "log in" without a provider.
-    // For this specific requirement, we show a notice.
-    alert("為了展示完整功能，建議您配置 Firebase 環境變數或在 GitHub Secrets 中設定。目前頁面僅供 UI 預覽。");
+  const handleTestMode = () => {
+    enterTestMode();
+    navigate('/');
   };
 
   return (
@@ -50,8 +48,8 @@ const Login: React.FC = () => {
               <Wallet className="text-white w-10 h-10" />
             </div>
           </div>
-          <h2 className="text-3xl font-extrabold text-center text-slate-900 mb-2">歡迎回來</h2>
-          <p className="text-center text-slate-500 mb-8">登入 SmartFinance 管理您的資產</p>
+          <h2 className="text-3xl font-extrabold text-center text-slate-900 mb-2">SmartFinance</h2>
+          <p className="text-center text-slate-500 mb-8">請選擇進入模式以管理您的資產</p>
 
           {error && (
             <div className="bg-rose-50 border border-rose-100 text-rose-600 px-4 py-3 rounded-xl flex items-center gap-3 mb-6">
@@ -60,58 +58,65 @@ const Login: React.FC = () => {
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">電子郵件</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all outline-none"
-                  placeholder="name@example.com"
-                  required
-                />
+          <div className="space-y-6">
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="flex items-center gap-2 text-sm font-bold text-indigo-600 mb-2">
+                <ShieldCheck className="w-4 h-4" />
+                <span>正式模式 (需資料庫連線)</span>
               </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">密碼</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all outline-none"
-                  placeholder="••••••••"
-                  required
-                />
+              <div>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="電子郵件"
+                    required
+                  />
+                </div>
               </div>
-            </div>
-            <button
-              disabled={loading}
-              className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50"
-            >
-              {loading ? '登入中...' : '登入系統'}
-            </button>
-          </form>
+              <div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="密碼"
+                    required
+                  />
+                </div>
+              </div>
+              <button
+                disabled={loading}
+                className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-all shadow-lg disabled:opacity-50"
+              >
+                {loading ? '登入中...' : '正式登入'}
+              </button>
+            </form>
 
-          <div className="mt-8 pt-8 border-t border-slate-100 text-center">
-            <p className="text-slate-500 mb-4">
-              還沒有帳號？{' '}
-              <Link to="/register" className="text-indigo-600 font-bold hover:underline">
-                立即註冊
-              </Link>
-            </p>
-            {isDemoMode && (
-               <button 
-               onClick={enterDemo}
-               className="text-sm text-slate-400 hover:text-slate-600"
-             >
-               進入展示模式 (僅限開發預覽)
-             </button>
-            )}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div>
+              <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-slate-400">或者</span></div>
+            </div>
+
+            <button
+              onClick={handleTestMode}
+              className="w-full border-2 border-indigo-600 text-indigo-600 font-bold py-4 rounded-xl hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"
+            >
+              <FlaskConical className="w-5 h-5" />
+              進入測試模式 (免帳號)
+            </button>
+          </div>
+
+          <div className="mt-8 pt-8 border-t border-slate-100 text-center text-slate-500">
+            還沒有正式帳號？{' '}
+            <Link to="/register" className="text-indigo-600 font-bold hover:underline">
+              立即註冊
+            </Link>
           </div>
         </div>
       </div>

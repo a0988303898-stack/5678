@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
-// Fix: Use consolidated named imports for Firebase Auth members to ensure compatibility
-import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { auth, isDemoMode } from './firebase';
-import { LayoutDashboard, Wallet, Receipt, PieChart, LogOut, LogIn, UserPlus, ShieldAlert } from 'lucide-react';
+import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
+import { auth, isDemoMode as firebaseUnconfigured } from './firebase';
+import { LayoutDashboard, Wallet, Receipt, PieChart, LogOut, ShieldAlert, FlaskConical } from 'lucide-react';
 
 // Pages
 import Dashboard from './pages/Dashboard';
@@ -14,41 +13,59 @@ import Accounts from './pages/Accounts';
 import Transactions from './pages/Transactions';
 import Reports from './pages/Reports';
 
-// Context
 interface AuthContextType {
-  user: User | null;
+  user: User | any | null;
   loading: boolean;
+  isTestMode: boolean;
   logout: () => Promise<void>;
+  enterTestMode: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
-  logout: async () => {}
+  isTestMode: false,
+  logout: async () => {},
+  enterTestMode: () => {}
 });
 
 export const useAuth = () => useContext(AuthContext);
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isTestMode, setIsTestMode] = useState(false);
 
   useEffect(() => {
     if (!auth) {
       setLoading(false);
       return;
     }
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (!isTestMode) {
+        setUser(firebaseUser);
+      }
       setLoading(false);
     });
     return unsubscribe;
-  }, []);
+  }, [isTestMode]);
 
   const logout = async () => {
-    if (auth) {
+    if (isTestMode) {
+      setIsTestMode(false);
+      setUser(null);
+    } else if (auth) {
       await signOut(auth);
     }
+  };
+
+  const enterTestMode = () => {
+    setIsTestMode(true);
+    setUser({
+      uid: 'test-user-id',
+      email: 'tester@smartfinance.demo',
+      displayName: '測試用戶'
+    });
   };
 
   if (loading) {
@@ -63,15 +80,21 @@ const App: React.FC = () => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, logout }}>
+    <AuthContext.Provider value={{ user, loading, isTestMode, logout, enterTestMode }}>
       <Router>
         <div className="min-h-screen flex flex-col md:flex-row bg-slate-50">
           {user && <Sidebar />}
           <div className="flex-1 overflow-auto">
-            {isDemoMode && (
+            {isTestMode && (
+              <div className="bg-indigo-600 text-white px-4 py-2 flex items-center justify-center gap-2 text-sm font-bold sticky top-0 z-50">
+                <FlaskConical className="w-4 h-4" />
+                <span>測試模式啟動中：資料僅儲存於本地記憶體，不會同步至資料庫。</span>
+              </div>
+            )}
+            {firebaseUnconfigured && !isTestMode && (
               <div className="bg-amber-100 border-b border-amber-200 px-4 py-2 flex items-center gap-2 text-amber-800 text-sm">
                 <ShieldAlert className="w-4 h-4" />
-                <span>目前處於「離線展示模式」，資料將不會儲存至雲端。</span>
+                <span>Firebase 未配置，請進入測試模式或檢查環境變數。</span>
               </div>
             )}
             <Routes>
