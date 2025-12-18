@@ -1,0 +1,5 @@
+{
+  "name": "Copy of SmartFinance AI - 個人化財務管理系統",
+  "description": "結合 Google Gemini 3 Pro AI 的智能金融管理工具，支援 Firebase 雲端同步與深度收支分析。",
+  "requestFramePermissions": []
+}
