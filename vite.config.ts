@@ -6,8 +6,8 @@ export default defineConfig({
   plugins: [react()],
   base: './',
   define: {
-    'process.env.API_KEY': JSON.stringify(process.env.API_KEY || null),
-    'process.env.FIREBASE_CONFIG': JSON.stringify(process.env.FIREBASE_CONFIG || null)
+    // 依照規範，Gemini API Key 仍維持從環境變數讀取
+    'process.env.API_KEY': JSON.stringify(process.env.API_KEY || null)
   },
   build: {
     minify: 'terser',
