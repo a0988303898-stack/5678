@@ -2,8 +2,8 @@
 // Use separate type imports for Firebase types to avoid value-level export errors
 import { initializeApp } from 'firebase/app';
 import type { FirebaseApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import type { Auth } from 'firebase/auth';
+// Fix: Consolidate modular Firebase Auth named exports to ensure they are correctly resolved by the compiler
+import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import type { Firestore } from 'firebase/firestore';
 

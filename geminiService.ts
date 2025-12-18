@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
 export const getFinancialAdvice = async (transactions: any[], accounts: any[]) => {
   // Directly access process.env.API_KEY as required by the library initialization guidelines
@@ -31,17 +31,17 @@ export const getFinancialAdvice = async (transactions: any[], accounts: any[]) =
       ${JSON.stringify(dataSummary, null, 2)}
     `;
 
-    // Query GenAI directly using ai.models.generateContent with both model name and prompt
-    const response = await ai.models.generateContent({
+    // Fix: Query GenAI directly using ai.models.generateContent with appropriate model and reasoning budget
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: prompt,
       config: {
-        // Thinking budget is appropriate for the gemini-3 series model
-        thinkingConfig: { thinkingBudget: 4000 }
+        // High reasoning budget for gemini-3-pro-preview to ensure high-quality financial analysis
+        thinkingConfig: { thinkingBudget: 32768 }
       }
     });
 
-    // Extract text directly from the .text property of GenerateContentResponse
+    // Extract text directly from the .text property of GenerateContentResponse (do not use .text())
     return response.text || "AI 暫時無法生成建議，請稍後再試。";
   } catch (error) {
     console.error("Gemini AI error:", error);
