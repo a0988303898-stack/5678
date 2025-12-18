@@ -1,60 +1,74 @@
 
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 
-// 聲明環境變數型別以通過 tsc 編譯
 declare const process: {
   env: {
     API_KEY: string;
   }
 };
 
-export const getFinancialAdvice = async (transactions: any[], accounts: any[]) => {
+const getAIClient = () => {
   const apiKey = process.env.API_KEY;
-  if (!apiKey || apiKey === 'null' || apiKey === 'undefined') {
-    return "系統偵測到未設定 API Key，無法提供 AI 分析。請在環境變數或專案設定中加入 API_KEY。";
-  }
+  if (!apiKey || apiKey === 'null' || apiKey === 'undefined') return null;
+  return new GoogleGenAI({ apiKey });
+};
+
+export const getDailyFortune = async (totalBalance: number) => {
+  const ai = getAIClient();
+  if (!ai) return null;
 
   try {
-    // 正確初始化 AI 客戶端
-    const ai = new GoogleGenAI({ apiKey });
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `你是理財占卜師。根據用戶總資產 $${totalBalance}，生成今日財運。
+      請回傳 JSON 格式：
+      {
+        "score": number (1-100),
+        "fortune": "簡短的一句話運勢",
+        "luckyColor": "顏色名稱",
+        "tip": "今日理財建議"
+      }`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            score: { type: Type.NUMBER },
+            fortune: { type: Type.STRING },
+            luckyColor: { type: Type.STRING },
+            tip: { type: Type.STRING }
+          },
+          required: ["score", "fortune", "luckyColor", "tip"]
+        }
+      }
+    });
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error("Daily fortune error:", error);
+    return null;
+  }
+};
 
+export const getFinancialAdvice = async (transactions: any[], accounts: any[]) => {
+  const ai = getAIClient();
+  if (!ai) return "系統偵測到未設定 API Key。";
+
+  try {
     const dataSummary = {
       accounts: accounts.map(a => ({ name: a.name, balance: a.balance })),
-      recentTransactions: transactions.slice(0, 15).map(t => ({
-        amount: t.amount,
-        type: t.type,
-        category: t.category,
-        note: t.note,
-        date: t.date
+      recentTransactions: transactions.slice(0, 10).map(t => ({
+        amount: t.amount, type: t.type, category: t.category, date: t.date
       }))
     };
 
-    const prompt = `
-      你是 SmartFinance AI 財務顧問。請根據以下用戶的財務數據提供 3-5 條具體的理財建議。
-      請針對當前資產狀態與最近支出模式進行分析。
-      
-      格式要求：
-      1. 使用繁體中文。
-      2. 專業且富有鼓勵性。
-      3. 以 Markdown 格式輸出。
-
-      用戶數據摘要：
-      ${JSON.stringify(dataSummary, null, 2)}
-    `;
-
-    // 呼叫 Gemini 3 Pro 進行生成
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: prompt,
-      config: {
-        thinkingConfig: { thinkingBudget: 32768 }
-      }
+      model: 'gemini-3-flash-preview',
+      contents: `請根據以下財務數據提供理財建議：${JSON.stringify(dataSummary)}。使用繁體中文，Markdown 格式。`,
+      config: { thinkingConfig: { thinkingBudget: 0 } }
     });
 
-    // 根據規範，直接讀取 .text 屬性（非方法）
-    return response.text || "AI 暫時無法生成分析報告，請稍後再試。";
+    return response.text;
   } catch (error) {
-    console.error("Gemini AI error:", error);
-    return "AI 服務目前的連線有些問題，請檢查 API 金鑰額度。";
+    return "AI 服務暫時無法連線。";
   }
 };

@@ -4,14 +4,23 @@ import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/f
 import { db } from '../firebase';
 import { useAuth } from '../App';
 import { BankAccount, Transaction } from '../types';
-import { Wallet, ArrowUpCircle, ArrowDownCircle, History, PieChart } from 'lucide-react';
+import { getDailyFortune } from '../geminiService';
+import { Wallet, ArrowUpCircle, ArrowDownCircle, History, Sparkles, Zap, Star } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+
+interface Fortune {
+  score: number;
+  fortune: string;
+  luckyColor: string;
+  tip: string;
+}
 
 const Dashboard: React.FC = () => {
   const { user, isTestMode } = useAuth();
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [fortune, setFortune] = useState<Fortune | null>(null);
+  const [loadingFortune, setLoadingFortune] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -19,35 +28,30 @@ const Dashboard: React.FC = () => {
     if (isTestMode) {
       const savedAccs = localStorage.getItem('smartfinance_accounts');
       const savedTrans = localStorage.getItem('smartfinance_transactions');
-      
       setAccounts(savedAccs ? JSON.parse(savedAccs) : []);
       setTransactions(savedTrans ? JSON.parse(savedTrans) : []);
-      setLoading(false);
       return;
     }
 
     if (!db) return;
-
-    const qAccounts = query(collection(db, 'accounts'), where('userId', '==', user.uid));
-    const unsubAccounts = onSnapshot(qAccounts, (snapshot) => {
-      setAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount)));
+    const unsubAccounts = onSnapshot(query(collection(db, 'accounts'), where('userId', '==', user.uid)), (snap) => {
+      setAccounts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount)));
     });
-
-    const qTrans = query(
-      collection(db, 'transactions'), 
-      where('userId', '==', user.uid),
-      orderBy('date', 'desc'),
-      limit(5)
-    );
-    const unsubTrans = onSnapshot(qTrans, (snapshot) => {
-      setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
-      setLoading(false);
+    const unsubTrans = onSnapshot(query(collection(db, 'transactions'), where('userId', '==', user.uid), orderBy('date', 'desc'), limit(5)), (snap) => {
+      setTransactions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
     });
-
     return () => { unsubAccounts(); unsubTrans(); };
   }, [user, isTestMode]);
 
   const totalBalance = accounts.reduce((acc, curr) => acc + curr.balance, 0);
+
+  const fetchFortune = async () => {
+    setLoadingFortune(true);
+    const result = await getDailyFortune(totalBalance);
+    if (result) setFortune(result);
+    setLoadingFortune(false);
+  };
+
   const monthlyIncome = transactions
     .filter(t => t.type === 'income' && t.date.startsWith(new Date().toISOString().slice(0, 7)))
     .reduce((acc, curr) => acc + curr.amount, 0);
@@ -55,82 +59,125 @@ const Dashboard: React.FC = () => {
     .filter(t => t.type === 'expense' && t.date.startsWith(new Date().toISOString().slice(0, 7)))
     .reduce((acc, curr) => acc + curr.amount, 0);
 
-  const chartData = [
-    { name: '本月收入', value: monthlyIncome || 0, color: '#10b981' },
-    { name: '本月支出', value: monthlyExpense || 0, color: '#ef4444' }
-  ];
-
-  if (loading) return null;
-
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-black text-slate-800">
-            {isTestMode ? '在地數據概覽' : `主儀表板`}
+    <div className="p-6 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+      {/* Header & Fortune Section */}
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 flex flex-col justify-center">
+          <h2 className="text-4xl font-black text-slate-800 tracking-tight mb-2">
+            Hey, {user?.email?.split('@')[0] || '朋友'}
           </h2>
-          <p className="text-slate-400 font-medium">
-            {isTestMode ? '資料目前存於您的瀏覽器中' : `歡迎回來，${user?.email?.split('@')[0]}`}
+          <p className="text-slate-400 font-bold text-lg">
+            今天打算如何讓您的財富更進一步？
           </p>
         </div>
-      </header>
+        
+        <div className="relative group">
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-[2rem] blur opacity-30 group-hover:opacity-50 transition duration-1000"></div>
+          <div className="relative bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl overflow-hidden min-h-[160px] flex flex-col justify-between">
+            {fortune ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-xs font-black uppercase tracking-wider">
+                    <Star className="w-3 h-3 fill-indigo-600" /> 今日金運: {fortune.score}%
+                  </div>
+                  <div className="text-xs font-bold text-slate-400">幸運色: {fortune.luckyColor}</div>
+                </div>
+                <p className="text-slate-800 font-black leading-tight">{fortune.fortune}</p>
+                <p className="text-xs text-slate-500 font-medium italic">“ {fortune.tip} ”</p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
+                <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center">
+                  <Sparkles className="text-indigo-600 w-6 h-6 animate-pulse" />
+                </div>
+                <button 
+                  onClick={fetchFortune}
+                  disabled={loadingFortune}
+                  className="text-sm font-black text-indigo-600 hover:text-indigo-700 transition-colors"
+                >
+                  {loadingFortune ? '正在讀取星象...' : '查看今日金運占卜 →'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
 
+      {/* Stats Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard title="總資產" value={totalBalance} icon={<Wallet className="text-indigo-600" />} color="indigo" />
-        <StatCard title="本月收入" value={monthlyIncome} icon={<ArrowUpCircle className="text-emerald-600" />} color="emerald" />
-        <StatCard title="本月支出" value={monthlyExpense} icon={<ArrowDownCircle className="text-rose-600" />} color="rose" />
+        <StatCard title="淨資產總計" value={totalBalance} icon={<Wallet className="text-white" />} gradient="from-indigo-600 to-blue-500" />
+        <StatCard title="本月總流入" value={monthlyIncome} icon={<ArrowUpCircle className="text-white" />} gradient="from-emerald-500 to-teal-400" />
+        <StatCard title="本月總流出" value={monthlyExpense} icon={<ArrowDownCircle className="text-white" />} gradient="from-rose-500 to-orange-400" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
-          <h3 className="text-lg font-bold mb-8 text-slate-800 flex items-center gap-3">
-            <PieChart className="w-5 h-5 text-indigo-500" />
-            本月收支比例
+      {/* Main Content Area */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Recent Transactions List */}
+        <div className="lg:col-span-2 bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
+              <History className="w-6 h-6 text-indigo-500" />
+              最近的交易活動
+            </h3>
+            <button className="text-sm font-bold text-indigo-600">查看全部</button>
+          </div>
+          <div className="space-y-4">
+            {transactions.map(t => (
+              <div key={t.id} className="flex items-center justify-between p-5 rounded-3xl bg-slate-50/50 hover:bg-slate-50 transition-all cursor-default group">
+                <div className="flex items-center gap-5">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${t.type === 'income' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                    {t.type === 'income' ? <ArrowUpCircle className="w-7 h-7" /> : <ArrowDownCircle className="w-7 h-7" />}
+                  </div>
+                  <div>
+                    <p className="font-black text-slate-800 text-lg">{t.category}</p>
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{t.date}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className={`text-xl font-black ${t.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                    {t.type === 'income' ? '+' : '-'}{t.amount.toLocaleString()}
+                  </span>
+                  <p className="text-[10px] text-slate-300 font-bold uppercase">{t.note || '無備註'}</p>
+                </div>
+              </div>
+            ))}
+            {transactions.length === 0 && (
+              <div className="text-center py-20 bg-slate-50/50 rounded-3xl border-2 border-dashed border-slate-200">
+                 <p className="text-slate-400 font-bold">目前還沒有交易數據，開始記錄吧！</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Mini Chart / Insight */}
+        <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 flex flex-col">
+          <h3 className="text-xl font-black text-slate-800 mb-8 flex items-center gap-3">
+             <Zap className="w-6 h-6 text-amber-500" />
+             本月收支概覽
           </h3>
-          <div className="h-64">
+          <div className="flex-1 min-h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <BarChart data={[
+                { name: '收入', value: monthlyIncome, color: '#10b981' },
+                { name: '支出', value: monthlyExpense, color: '#ef4444' }
+              ]} margin={{top: 0, right: 0, left: -20, bottom: 0}}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 600}} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 14, fontWeight: 700}} />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} />
-                <Bar dataKey="value" radius={[8, 8, 8, 8]} barSize={50}>
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
+                <Tooltip cursor={{fill: 'transparent'}} />
+                <Bar dataKey="value" radius={[12, 12, 12, 12]} barSize={45}>
+                  <Cell fill="#10b981" />
+                  <Cell fill="#ef4444" />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
-
-        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
-          <h3 className="text-lg font-bold mb-8 text-slate-800 flex items-center gap-3">
-            <History className="w-5 h-5 text-indigo-500" />
-            最近活動
-          </h3>
-          <div className="space-y-4">
-            {transactions.slice(0, 5).map(t => (
-              <div key={t.id} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${t.type === 'income' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-                    {t.type === 'income' ? <ArrowUpCircle className="w-6 h-6" /> : <ArrowDownCircle className="w-6 h-6" />}
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-800">{t.category}</p>
-                    <p className="text-xs text-slate-400 font-bold">{t.date}</p>
-                  </div>
-                </div>
-                <span className={`text-lg font-black ${t.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                  {t.type === 'income' ? '+' : '-'}{t.amount.toLocaleString()}
-                </span>
-              </div>
-            ))}
-            {transactions.length === 0 && (
-              <div className="text-center py-10">
-                 <p className="text-slate-300 font-bold">尚無活動紀錄</p>
-              </div>
-            )}
+          <div className="mt-6 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+             <p className="text-xs font-bold text-indigo-700 leading-relaxed">
+               您的收支差距為 <span className="font-black">${Math.abs(monthlyIncome - monthlyExpense).toLocaleString()}</span>，
+               {monthlyIncome > monthlyExpense ? '做得好！本月處於盈餘狀態。' : '本月支出較多，建議檢視非必要花費。'}
+             </p>
           </div>
         </div>
       </div>
@@ -138,15 +185,23 @@ const Dashboard: React.FC = () => {
   );
 };
 
-const StatCard = ({ title, value, icon, color }: { title: string, value: number, icon: React.ReactNode, color: string }) => (
-  <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 flex items-start justify-between group hover:border-indigo-100 transition-all">
-    <div>
-      <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">{title}</p>
-      <h4 className="text-3xl font-black text-slate-900">${value.toLocaleString()}</h4>
+const StatCard = ({ title, value, icon, gradient }: { title: string, value: number, icon: React.ReactNode, gradient: string }) => (
+  <div className={`relative overflow-hidden bg-gradient-to-br ${gradient} p-8 rounded-[2.5rem] shadow-xl group hover:-translate-y-1 transition-all duration-300`}>
+    <div className="relative z-10 flex flex-col justify-between h-full">
+      <div className="flex justify-between items-start mb-6">
+        <div className="p-3 bg-white/20 backdrop-blur-md rounded-2xl">
+          {icon}
+        </div>
+        <div className="text-white/40 group-hover:text-white/60 transition-colors">
+          <Zap className="w-8 h-8 opacity-20" />
+        </div>
+      </div>
+      <div>
+        <p className="text-white/70 text-sm font-bold uppercase tracking-widest mb-1">{title}</p>
+        <h4 className="text-4xl font-black text-white tracking-tighter">${value.toLocaleString()}</h4>
+      </div>
     </div>
-    <div className={`p-4 rounded-2xl bg-${color}-50 group-hover:scale-110 transition-transform`}>
-      {icon}
-    </div>
+    <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-white/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700"></div>
   </div>
 );
 
